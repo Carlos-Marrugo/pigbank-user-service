@@ -80,3 +80,36 @@ func RegisterHandler(ctx context.Context, req models.RegisterRequest) (string, e
 
 	return fmt.Sprintf("User %s registered. Card request sent to SQS.", user.UUID), nil
 }
+
+func LoginHandler(ctx context.Context, req models.LoginRequest) (string, error) {
+    customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+        return aws.Endpoint{
+            URL:           "http://localhost:4566",
+            SigningRegion: "us-east-1",
+        }, nil
+    })
+
+    cfg, _ := config.LoadDefaultConfig(ctx,
+        config.WithRegion("us-east-1"),
+        config.WithEndpointResolverWithOptions(customResolver),
+        config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
+    )
+
+    repo := repository.NewUserRepository(dynamodb.NewFromConfig(cfg))
+
+    user, err := repo.FindByEmail(ctx, req.Email)
+    if err != nil {
+        return "", fmt.Errorf("usuario no encontrado o error en db")
+    }
+
+    if !CheckPasswordHash(req.Password, user.Password) {
+        return "", fmt.Errorf("credenciales inválidas")
+    }
+
+    token, err := GenerateToken(user.Email, user.UUID)
+    if err != nil {
+        return "", fmt.Errorf("error al generar token")
+    }
+
+    return token, nil
+}

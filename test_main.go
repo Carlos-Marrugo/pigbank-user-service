@@ -9,7 +9,7 @@ import (
 	"github.com/Carlos-Marrugo/pigbank-user-service/internal/service" 
 )
 
-func main() {
+func maint() {
 	req := models.RegisterRequest{
 		Name:     "Jane",
 		LastName: "Doe",
