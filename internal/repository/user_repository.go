@@ -58,3 +58,45 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*models
 	err = attributevalue.UnmarshalMap(result.Items[0], &user)
 	return &user, err
 }
+
+func (r *UserRepository) FindByID(ctx context.Context, uuid string) (*models.User, error) {
+	input := &dynamodb.ScanInput{
+		TableName:        aws.String(r.tableName),
+		FilterExpression: aws.String("uuid = :u"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":u": &types.AttributeValueMemberS{Value: uuid},
+		},
+	}
+
+	result, err := r.client.Scan(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result.Items) == 0 {
+		return nil, fmt.Errorf("user not found with uuid: %s", uuid)
+	}
+
+	var user models.User
+	err = attributevalue.UnmarshalMap(result.Items[0], &user)
+	return &user, err
+}
+
+func (r *UserRepository) Update(ctx context.Context, uuid string, document string, address string, phone string) error {
+	input := &dynamodb.UpdateItemInput{
+		TableName: aws.String(r.tableName),
+		Key: map[string]types.AttributeValue{
+			"uuid":     &types.AttributeValueMemberS{Value: uuid},
+			"document": &types.AttributeValueMemberS{Value: document},
+		},
+		UpdateExpression: aws.String("SET address = :a, phone = :p"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":a": &types.AttributeValueMemberS{Value: address},
+			":p": &types.AttributeValueMemberS{Value: phone},
+		},
+		ReturnValues: types.ReturnValueUpdatedNew,
+	}
+
+	_, err := r.client.UpdateItem(ctx, input)
+	return err
+}

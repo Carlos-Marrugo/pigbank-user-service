@@ -9,35 +9,24 @@ import (
 	"github.com/Carlos-Marrugo/pigbank-user-service/internal/models"
 	"github.com/Carlos-Marrugo/pigbank-user-service/internal/repository"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/google/uuid"
 )
 
+var (
+	userRepo  *repository.UserRepository
+	sqsClient *sqs.Client
+)
+
+func SetRepository(r *repository.UserRepository, s *sqs.Client) {
+	userRepo = r
+	sqsClient = s
+}
+
 func RegisterHandler(ctx context.Context, req models.RegisterRequest) (string, error) {
-
-	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-		return aws.Endpoint{
-			URL:           "http://localhost:4566",
-			SigningRegion: "us-east-1",
-		}, nil
-	})
-
-	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion("us-east-1"),
-		config.WithEndpointResolverWithOptions(customResolver),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
-	)
-
-	if err != nil {
-		return "Config Error", fmt.Errorf("unable to load SDK config: %v", err)
+	if userRepo == nil || sqsClient == nil {
+		return "Initialization Error", fmt.Errorf("repository or SQS client not initialized")
 	}
-
-	dbClient := dynamodb.NewFromConfig(cfg)
-	sqsClient := sqs.NewFromConfig(cfg)
-	repo := repository.NewUserRepository(dbClient)
 
 	hashedPassword, err := HashPassword(req.Password)
 	if err != nil {
@@ -53,11 +42,13 @@ func RegisterHandler(ctx context.Context, req models.RegisterRequest) (string, e
 		Document: req.Document,
 	}
 
-	err = repo.Save(ctx, user)
+	// USAMOS EL REPOSITORIO GLOBAL
+	err = userRepo.Save(ctx, user)
 	if err != nil {
 		return "Database Error", fmt.Errorf("failed to save user: %v", err)
 	}
 
+	// Manejo de SQS
 	queueURL := os.Getenv("CARD_QUEUE_URL")
 	if queueURL == "" {
 		queueURL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/create-request-card-sqs"
@@ -82,34 +73,36 @@ func RegisterHandler(ctx context.Context, req models.RegisterRequest) (string, e
 }
 
 func LoginHandler(ctx context.Context, req models.LoginRequest) (string, error) {
-    customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-        return aws.Endpoint{
-            URL:           "http://localhost:4566",
-            SigningRegion: "us-east-1",
-        }, nil
-    })
+	if userRepo == nil {
+		return "", fmt.Errorf("repository not initialized")
+	}
 
-    cfg, _ := config.LoadDefaultConfig(ctx,
-        config.WithRegion("us-east-1"),
-        config.WithEndpointResolverWithOptions(customResolver),
-        config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
-    )
+	user, err := userRepo.FindByEmail(ctx, req.Email)
+	if err != nil {
+		return "", fmt.Errorf("usuario no encontrado o error en db")
+	}
 
-    repo := repository.NewUserRepository(dynamodb.NewFromConfig(cfg))
+	if !CheckPasswordHash(req.Password, user.Password) {
+		return "", fmt.Errorf("credenciales inválidas")
+	}
 
-    user, err := repo.FindByEmail(ctx, req.Email)
-    if err != nil {
-        return "", fmt.Errorf("usuario no encontrado o error en db")
-    }
+	token, err := GenerateToken(user.Email, user.UUID)
+	if err != nil {
+		return "", fmt.Errorf("error al generar token")
+	}
 
-    if !CheckPasswordHash(req.Password, user.Password) {
-        return "", fmt.Errorf("credenciales inválidas")
-    }
+	return token, nil
+}
 
-    token, err := GenerateToken(user.Email, user.UUID)
-    if err != nil {
-        return "", fmt.Errorf("error al generar token")
-    }
+func UpdateUserProfile(ctx context.Context, userID string, req models.UpdateProfileRequest) error {
+	if userRepo == nil {
+		return fmt.Errorf("repository not initialized")
+	}
 
-    return token, nil
+	user, err := userRepo.FindByID(ctx, userID) 
+	if err != nil {
+		return fmt.Errorf("user not found: %v", err)
+	}
+
+	return userRepo.Update(ctx, userID, user.Document, req.Address, req.Phone)
 }

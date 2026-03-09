@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+
 	"github.com/Carlos-Marrugo/pigbank-user-service/internal/models"
 	"github.com/Carlos-Marrugo/pigbank-user-service/internal/service"
 	"github.com/gin-gonic/gin"
@@ -38,4 +39,22 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
+func (h *UserHandler) UpdateProfile(c *gin.Context) {
+	userID := c.Param("user_id")
+
+	var req models.UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid update data"})
+		return
+	}
+
+	err := service.UpdateUserProfile(c.Request.Context(), userID, req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Profile updated successfully for " + userID})
 }
