@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+
 	"github.com/Carlos-Marrugo/pigbank-user-service/internal/api"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"

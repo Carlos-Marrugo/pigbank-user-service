@@ -9,7 +9,7 @@ import (
 	"github.com/Carlos-Marrugo/pigbank-user-service/internal/service"
 )
 
-func main() {
+func main_login_test() {
 	req := models.LoginRequest{
 		Email:    "jane@doe.com",
 		Password: "password123",
