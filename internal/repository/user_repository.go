@@ -62,7 +62,10 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*models
 func (r *UserRepository) FindByID(ctx context.Context, uuid string) (*models.User, error) {
 	input := &dynamodb.ScanInput{
 		TableName:        aws.String(r.tableName),
-		FilterExpression: aws.String("uuid = :u"),
+		FilterExpression: aws.String("#uid = :u"),
+		ExpressionAttributeNames: map[string]string{
+			"#uid": "uuid", 
+		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":u": &types.AttributeValueMemberS{Value: uuid},
 		},
