@@ -58,3 +58,27 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Profile updated successfully for " + userID})
 }
+
+func (h *UserHandler) UploadAvatar(c *gin.Context) {
+	userID := c.Param("user_id")
+	authenticatedUUID := c.GetString("user_uuid")
+
+	if userID != authenticatedUUID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var req models.AvatarRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	url, err := service.UploadAvatar(c.Request.Context(), userID, req.AvatarBase64)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"avatar_url": url})
+}

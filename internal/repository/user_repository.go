@@ -64,7 +64,7 @@ func (r *UserRepository) FindByID(ctx context.Context, uuid string) (*models.Use
 		TableName:        aws.String(r.tableName),
 		FilterExpression: aws.String("#uid = :u"),
 		ExpressionAttributeNames: map[string]string{
-			"#uid": "uuid", 
+			"#uid": "uuid",
 		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":u": &types.AttributeValueMemberS{Value: uuid},
@@ -100,6 +100,22 @@ func (r *UserRepository) Update(ctx context.Context, uuid string, document strin
 		ReturnValues: types.ReturnValueUpdatedNew,
 	}
 
+	_, err := r.client.UpdateItem(ctx, input)
+	return err
+}
+
+func (r *UserRepository) UpdateAvatarURL(ctx context.Context, uuid string, document string, avatarURL string) error {
+	input := &dynamodb.UpdateItemInput{
+		TableName: aws.String(r.tableName),
+		Key: map[string]types.AttributeValue{
+			"uuid":     &types.AttributeValueMemberS{Value: uuid},
+			"document": &types.AttributeValueMemberS{Value: document},
+		},
+		UpdateExpression: aws.String("SET avatar_url = :a"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":a": &types.AttributeValueMemberS{Value: avatarURL},
+		},
+	}
 	_, err := r.client.UpdateItem(ctx, input)
 	return err
 }

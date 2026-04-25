@@ -42,13 +42,11 @@ func RegisterHandler(ctx context.Context, req models.RegisterRequest) (string, e
 		Document: req.Document,
 	}
 
-	// USAMOS EL REPOSITORIO GLOBAL
 	err = userRepo.Save(ctx, user)
 	if err != nil {
 		return "Database Error", fmt.Errorf("failed to save user: %v", err)
 	}
 
-	// Manejo de SQS
 	queueURL := os.Getenv("CARD_QUEUE_URL")
 	if queueURL == "" {
 		queueURL = "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/create-request-card-sqs"
@@ -64,7 +62,7 @@ func RegisterHandler(ctx context.Context, req models.RegisterRequest) (string, e
 		QueueUrl:    aws.String(queueURL),
 		MessageBody: aws.String(string(body)),
 	})
-
+	
 	if err != nil {
 		return "User saved, but SQS failed", fmt.Errorf("sqs error: %v", err)
 	}
@@ -99,7 +97,7 @@ func UpdateUserProfile(ctx context.Context, userID string, req models.UpdateProf
 		return fmt.Errorf("repository not initialized")
 	}
 
-	user, err := userRepo.FindByID(ctx, userID) 
+	user, err := userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("user not found: %v", err)
 	}
