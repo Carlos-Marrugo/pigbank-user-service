@@ -24,7 +24,15 @@ func main() {
 	}
 
 	ctx := context.TODO()
+
 	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		if service == "s3" {
+			return aws.Endpoint{
+				URL:               "http://localhost:4566",
+				SigningRegion:     "us-east-1",
+				HostnameImmutable: true,
+			}, nil
+		}
 		return aws.Endpoint{
 			URL:           "http://localhost:4566",
 			SigningRegion: "us-east-1",
@@ -42,10 +50,13 @@ func main() {
 
 	dbClient := dynamodb.NewFromConfig(cfg)
 	sqsClient := sqs.NewFromConfig(cfg)
-	s3Client := s3.NewFromConfig(cfg)
+
+	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.UsePathStyle = true
+	})
+
 	userRepo := repository.NewUserRepository(dbClient)
 
-	// Configurar bucket de avatars desde variable de entorno o usar el de Terraform
 	avatarBucket := os.Getenv("AVATAR_BUCKET_NAME")
 	if avatarBucket == "" {
 		avatarBucket = "pigbank-user-avatars-04f720f8"
@@ -59,11 +70,9 @@ func main() {
 
 	v1 := r.Group("/api/v1")
 	{
-		// Rutas públicas
 		v1.POST("/register", userHandler.Register)
 		v1.POST("/login", userHandler.Login)
 
-		// Rutas protegidas con JWT
 		authorized := v1.Group("/")
 		authorized.Use(api.AuthMiddleware())
 		{

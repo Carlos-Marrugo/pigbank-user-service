@@ -43,6 +43,12 @@ func (h *UserHandler) Login(c *gin.Context) {
 
 func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	userID := c.Param("user_id")
+	authenticatedUUID := c.GetString("user_uuid")
+
+	if userID != authenticatedUUID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "unauthorized"})
+		return
+	}
 
 	var req models.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
